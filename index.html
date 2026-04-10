@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foodie's Hub | Smart POS</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js');
+            });
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #fef2f2;
+        }
+        .category-pill-active {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+        .sidebar-item-active {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #fecaca;
+            border-radius: 10px;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+        }
+        .print-only { display: none; }
+        .food-card:hover {
+            transform: translateY(-4px);
+        }
+        .animate-pop {
+            animation: pop 0.2s ease-out;
+        }
+        @keyframes pop {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-20 md:w-64 bg-white border-r border-red-100 flex flex-col no-print">
+        <div class="p-6">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-red-200">
+                    <i data-lucide="utensils" class="w-7 h-7"></i>
+                </div>
+                <div class="hidden md:block">
+                    <h1 class="font-extrabold text-slate-800 leading-tight text-xl italic">Foodie's<span class="text-red-500 font-black">Hub</span></h1>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-[2px]">Taste of Perfection</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="admin-indicator" class="px-4 py-2 mb-6 bg-slate-100 rounded-xl flex items-center gap-2">
+            <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
+            <span id="status-text" class="text-[10px] font-black uppercase tracking-widest text-slate-400">Staff Mode</span>
+            <button onclick="lockAdmin()" id="lock-btn" class="ml-auto hidden text-red-500"><i data-lucide="log-out" class="w-4 h-4"></i></button>
+        </div>
+        
+        <nav class="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+            <button onclick="showSection('dashboard')" data-section="dashboard" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">Dashboard</span>
+            </button>
+            <button onclick="showSection('pos')" data-section="pos" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="shopping-cart" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">POS System</span>
+            </button>
+            <button onclick="showSection('inventory')" data-section="inventory" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="conveyor-belt" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">Menu & stock</span>
+            </button>
+            <button onclick="showSection('reports')" data-section="reports" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="bar-chart-3" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">Daily Reports</span>
+            </button>
+            <button onclick="showSection('expenses')" data-section="expenses" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="banknote" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">Expenses</span>
+            </button>
+            <button onclick="showSection('kitchen')" data-section="kitchen" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300 group">
+                <i data-lucide="container" class="w-6 h-6 group-hover:scale-110 transition-transform"></i>
+                <span class="font-bold hidden md:block">Kitchen Stock</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-red-50">
+            <button onclick="showSection('settings')" data-section="settings" class="sidebar-btn w-full flex items-center justify-center md:justify-start gap-3 px-4 py-3 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-all duration-300">
+                <i data-lucide="cog" class="w-6 h-6"></i>
+                <span class="font-bold hidden md:block">Settings</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col relative overflow-hidden h-screen">
+        <!-- Header -->
+        <header class="h-20 bg-white border-b border-red-50 flex items-center justify-between px-8 no-print">
+            <div>
+                <h2 id="section-title" class="text-2xl font-black text-slate-800">Hello, Chef! 👋</h2>
+                <p id="current-full-date" class="text-xs text-slate-400 font-medium"></p>
+            </div>
+            <div class="flex items-center gap-6">
+                 <div class="bg-red-50 px-4 py-2 rounded-xl border border-red-100 hidden sm:flex items-center gap-3">
+                    <i data-lucide="clock" class="w-4 h-4 text-red-500 animate-pulse"></i>
+                    <span id="digital-clock" class="text-red-600 font-black text-sm">00:00:00</span>
+                </div>
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center border border-slate-200 shadow-inner">
+                    <i data-lucide="user" class="w-6 h-6 text-slate-400"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <div id="content-container" class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar no-print">
+            
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="space-y-8 hidden">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="p-8 bg-white rounded-3xl border border-red-50 shadow-sm relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-24 h-24 bg-red-50 rounded-full group-hover:scale-150 transition-transform duration-700 opacity-50"></div>
+                        <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Today's Revenue</h3>
+                        <p id="dash-revenue" class="text-3xl font-black text-slate-800">Rs. 0.00</p>
+                        <div class="mt-4 flex items-center gap-2 text-emerald-500 text-xs font-bold">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                            <span>All time average</span>
+                        </div>
+                    </div>
+                    <div class="p-8 bg-white rounded-3xl border border-red-50 shadow-sm relative overflow-hidden group">
+                         <div class="absolute -right-4 -top-4 w-24 h-24 bg-orange-50 rounded-full group-hover:scale-150 transition-transform duration-700 opacity-50"></div>
+                        <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Total Orders</h3>
+                        <p id="dash-orders" class="text-3xl font-black text-slate-800">0</p>
+                        <div class="mt-4 flex items-center gap-2 text-orange-400 text-xs font-bold">
+                            <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+                            <span>Serving Now</span>
+                        </div>
+                    </div>
+                    <div class="p-8 bg-white rounded-3xl border border-red-50 shadow-sm relative overflow-hidden group">
+                         <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-700 opacity-50"></div>
+                        <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Raw Materials</h3>
+                        <p id="dash-materials" class="text-3xl font-black text-slate-800">0</p>
+                        <div class="mt-4 flex items-center gap-2 text-blue-500 text-xs font-bold">
+                            <i data-lucide="package-search" class="w-4 h-4"></i>
+                            <span>In Kitchen</span>
+                        </div>
+                    </div>
+                    <div class="p-8 bg-slate-900 border border-slate-800 rounded-3xl shadow-xl shadow-slate-200 relative overflow-hidden group">
+                         <div class="absolute -right-4 -top-4 w-24 h-24 bg-red-500 rounded-full opacity-20 group-hover:scale-150 transition-transform duration-700"></div>
+                        <h3 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Cash In Hand</h3>
+                        <p id="dash-cash-hand" class="text-3xl font-black text-white">Rs. 0.00</p>
+                        <div class="mt-4 flex items-center gap-2 text-red-400 text-xs font-bold">
+                            <i data-lucide="wallet" class="w-4 h-4"></i>
+                            <span>Sales - Expenses</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-white p-8 rounded-3xl border border-red-50 shadow-sm">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-extrabold text-slate-800 text-lg">Recent Transactions</h3>
+                            <button onclick="showSection('reports')" class="text-red-500 text-xs font-black uppercase tracking-widest hover:underline">View All</button>
+                        </div>
+                        <div class="space-y-4" id="dash-recent-list">
+                            <!-- JS -->
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-3xl border border-red-50 shadow-sm">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-extrabold text-slate-800 text-lg">Low Stock Items</h3>
+                             <i data-lucide="alert-circle" class="w-6 h-6 text-red-400"></i>
+                        </div>
+                        <div class="space-y-4" id="dash-low-stock">
+                            <!-- JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- POS Section -->
+            <section id="pos" class="h-full hidden">
+                <div class="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
+                    <!-- Category Sidebar -->
+                    <div class="w-full lg:w-48 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto no-scrollbar pb-2 lg:pb-0" id="pos-categories">
+                        <!-- Dynamic Categories will be injected here -->
+                    </div>
+
+                    <!-- Menu Side -->
+                    <div class="flex-1 flex flex-col gap-6 overflow-hidden">
+                        <div class="relative w-full">
+                            <i data-lucide="search" class="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="pos-search" placeholder="Quick Search (F2)..." class="w-full pl-12 pr-4 py-4 bg-white border border-red-50 rounded-2xl shadow-sm focus:ring-4 focus:ring-red-500/10 focus:border-red-500 outline-none transition-all font-medium">
+                        </div>
+
+                        <div id="pos-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 gap-4 overflow-y-auto custom-scrollbar pr-2 pb-8">
+                            <!-- Food Cards -->
+                        </div>
+                    </div>
+
+                    <!-- Cart Side -->
+                    <div class="w-full lg:w-96 bg-white rounded-[2.5rem] border border-red-50 shadow-2xl flex flex-col overflow-hidden">
+                        <div class="p-8 pb-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-xl font-black text-slate-800">Current Order</h3>
+                                <button onclick="clearCart()" class="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all">
+                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2 text-[10px] font-black text-slate-300 uppercase tracking-widest border-b border-red-50 pb-4">
+                                <span>Item</span>
+                                <span class="ml-auto">Price</span>
+                            </div>
+                        </div>
+
+                        <div id="cart-list" class="flex-1 overflow-y-auto px-8 space-y-4 custom-scrollbar">
+                            <!-- Cart Items -->
+                            <div class="h-full flex flex-col items-center justify-center text-slate-300 opacity-60">
+                                <i data-lucide="soup" class="w-16 h-16 mb-4 animate-bounce"></i>
+                                <p class="font-bold text-lg italic">Hungry for orders?</p>
+                            </div>
+                        </div>
+
+                        <div class="p-8 bg-slate-50 border-t border-red-50 space-y-6">
+                            <div class="space-y-3">
+                                <div class="flex justify-between text-slate-400 font-bold text-sm">
+                                    <span>Subtotal</span>
+                                    <span id="cart-subtotal">Rs. 0.00</span>
+                                </div>
+                                <div class="flex justify-between text-slate-800 font-black text-2xl pt-2 border-t border-red-100">
+                                    <span>Total</span>
+                                    <span id="cart-total" class="text-red-500">Rs. 0.00</span>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-2 p-1 bg-white border border-red-50 rounded-2xl shadow-sm">
+                                    <button id="pay-cash" onclick="setPaymentMethod('cash')" class="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-500 text-white shadow-lg shadow-red-100">
+                                        <i data-lucide="banknote" class="w-4 h-4 inline-block mr-1"></i> Cash
+                                    </button>
+                                    <button id="pay-online" onclick="setPaymentMethod('online')" class="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-slate-400 hover:bg-blue-50 hover:text-blue-500">
+                                        <i data-lucide="smartphone-nfc" class="w-4 h-4 inline-block mr-1"></i> Online
+                                    </button>
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-300 uppercase text-[10px]">Cash Received</span>
+                                    <input type="number" id="cash-input" oninput="calcBalance()" placeholder="0.00" class="w-full pl-32 pr-4 py-4 bg-white border border-red-100 rounded-2xl text-right font-black text-xl text-slate-800 focus:ring-4 focus:ring-red-500/10 outline-none">
+                                </div>
+                                <div id="balance-area" class="flex items-center justify-between p-4 bg-red-500 rounded-2xl text-white shadow-lg shadow-red-200">
+                                    <span class="font-bold uppercase text-[10px] tracking-widest opacity-80">Change Balance</span>
+                                    <span id="cash-balance" class="font-black text-2xl">Rs. 0.00</span>
+                                </div>
+                                <button id="checkout-btn" onclick="checkout()" class="w-full py-5 bg-slate-800 text-white font-black text-lg rounded-2xl hover:bg-slate-900 shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-3">
+                                    PLACE ORDER <i data-lucide="arrow-right" class="w-6 h-6"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Inventory Section -->
+            <section id="inventory" class="hidden space-y-8">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800">Menu & Inventory</h3>
+                        <p class="text-xs text-slate-400 font-medium">Manage your delicious dishes and stock levels.</p>
+                    </div>
+                    <button onclick="openProductModal()" class="px-8 py-4 bg-red-500 text-white font-black rounded-2xl shadow-xl shadow-red-100 hover:scale-105 transition-transform flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-6 h-6"></i> Add Item
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-[2rem] border border-red-50 shadow-sm overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-red-50/50 border-b border-red-50">
+                            <tr class="text-[10px] font-black text-red-400 uppercase tracking-widest">
+                                <th class="px-8 py-5">Dish Details</th>
+                                <th class="px-8 py-5">Category</th>
+                                <th class="px-8 py-5">Price</th>
+                                <th class="px-8 py-5">Stock Status</th>
+                                <th class="px-8 py-5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-list" class="divide-y divide-red-50">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports" class="hidden space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="p-8 bg-white border border-red-50 rounded-3xl shadow-sm">
+                        <h4 class="text-slate-400 text-xs font-black uppercase tracking-[2px] mb-2">Total Sales</h4>
+                        <p id="rep-total" class="text-4xl font-black text-slate-800">Rs. 0.00</p>
+                    </div>
+                    <div class="p-8 bg-white border border-red-50 rounded-3xl shadow-sm">
+                         <h4 class="text-slate-400 text-xs font-black uppercase tracking-[2px] mb-2">Order Count</h4>
+                        <p id="rep-count" class="text-4xl font-black text-red-500">0</p>
+                    </div>
+                    <div class="flex items-center gap-4 bg-white p-8 rounded-3xl border border-red-50 shadow-sm">
+                        <input type="date" id="rep-date" onchange="loadReports()" class="flex-1 px-4 py-3 bg-red-50 border border-red-100 rounded-xl font-bold text-red-600 outline-none">
+                        <button onclick="exportCSV()" class="p-4 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition-all">
+                            <i data-lucide="download" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-[2rem] border border-red-50 shadow-sm overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-red-50/50 border-b border-red-50 text-[10px] font-black text-red-400 uppercase tracking-widest">
+                            <tr>
+                                <th class="px-8 py-5">Order ID</th>
+                                <th class="px-8 py-5">Time</th>
+                                <th class="px-8 py-5">Summary</th>
+                                <th class="px-8 py-5">Amount</th>
+                                <th class="px-8 py-5 text-right">Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-list" class="divide-y divide-red-50">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Expenses Section -->
+            <section id="expenses" class="hidden space-y-8">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800">Daily Expenses</h3>
+                        <p class="text-xs text-slate-400 font-medium">Track money going out from the cashier.</p>
+                    </div>
+                    <button onclick="openExpenseModal()" class="px-8 py-4 bg-red-500 text-white font-black rounded-2xl shadow-xl shadow-red-100 hover:scale-105 transition-transform flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-6 h-6"></i> Record Cash Out
+                    </button>
+                </div>
+
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <!-- Expense Categories Sidebar (Dynamic) -->
+                    <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto lg:h-[400px] lg:w-48 no-scrollbar" id="exp-cat-strip">
+                        <!-- Dynamic Categories will be injected here -->
+                    </div>
+
+                    <div class="flex-1 space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="p-8 bg-white border border-red-50 rounded-3xl shadow-sm">
+                                <h4 class="text-slate-400 text-xs font-black uppercase tracking-[2px] mb-2">Selected Total</h4>
+                                <p id="exp-today-total" class="text-3xl font-black text-red-500">Rs. 0.00</p>
+                            </div>
+                            <div class="p-8 bg-white border border-red-50 rounded-3xl shadow-sm">
+                                <h4 class="text-slate-400 text-xs font-black uppercase tracking-[2px] mb-2">Highest record</h4>
+                                <p id="exp-highest" class="text-3xl font-black text-slate-800">Rs. 0.00</p>
+                            </div>
+                            <div class="flex items-center gap-4 bg-white p-8 rounded-3xl border border-red-50 shadow-sm">
+                                <input type="date" id="exp-date-filter" onchange="loadExpenses()" class="flex-1 px-4 py-3 bg-red-50 border border-red-100 rounded-xl font-bold text-red-600 outline-none">
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-[2rem] border border-red-50 shadow-sm overflow-hidden">
+                            <table class="w-full text-left">
+                                <thead class="bg-red-50/50 border-b border-red-50 text-[10px] font-black text-red-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th class="px-8 py-5">Time</th>
+                                        <th class="px-8 py-5">Description</th>
+                                        <th class="px-8 py-5">Category</th>
+                                        <th class="px-8 py-5">Amount</th>
+                                        <th class="px-8 py-5 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expenses-list" class="divide-y divide-red-50">
+                                    <!-- JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Kitchen Stock Section -->
+            <section id="kitchen" class="hidden space-y-8">
+                <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800">Kitchen Raw Materials</h3>
+                        <p class="text-xs text-slate-400 font-medium">Manage ingredients and supplies in your kitchen.</p>
+                    </div>
+                    <button onclick="openMaterialModal()" class="px-8 py-4 bg-red-500 text-white font-black rounded-2xl shadow-xl shadow-red-100 hover:scale-105 transition-transform flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-6 h-6"></i> Add Material
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-[2rem] border border-red-50 shadow-sm overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-red-50/50 border-b border-red-50 text-[10px] font-black text-red-400 uppercase tracking-widest">
+                            <tr>
+                                <th class="px-8 py-5">Material Name</th>
+                                <th class="px-8 py-5">Current Stock</th>
+                                <th class="px-8 py-5">Min. Alert Level</th>
+                                <th class="px-8 py-5">Status</th>
+                                <th class="px-8 py-5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="materials-list" class="divide-y divide-red-50">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                    <div class="p-10 bg-white rounded-[2.5rem] border border-red-50 shadow-sm space-y-6">
+                        <h4 class="text-xl font-black text-slate-800 italic">Security Settings</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current PIN</label>
+                                <input type="password" id="old-pin" maxlength="6" class="w-full px-5 py-4 bg-red-50 rounded-2xl font-bold outline-none">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">New 6-Digit PIN</label>
+                                <input type="password" id="new-pin" maxlength="6" class="w-full px-5 py-4 bg-red-50 rounded-2xl font-bold outline-none">
+                            </div>
+                        </div>
+                        <button onclick="updatePIN()" class="w-full py-4 bg-slate-800 text-white font-black rounded-2xl hover:bg-black transition-all">CHANGE PIN</button>
+                    </div>
+                </div>
+            </section>
+
+             <!-- Settings Section -->
+             <section id="settings" class="hidden space-y-8">
+                <div class="max-w-2xl bg-white p-10 rounded-[2.5rem] border border-red-50 shadow-sm space-y-10">
+                    <div>
+                        <h3 class="text-3xl font-black text-slate-800 italic">Kitchen Backup</h3>
+                        <p class="text-slate-400 font-medium">Keep your shop data safe and portable.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                        <button onclick="exportData()" class="p-8 bg-orange-50 border border-orange-100 rounded-3xl text-left hover:shadow-lg transition-all group">
+                             <div class="w-12 h-12 bg-white text-orange-500 rounded-2xl flex items-center justify-center mb-6 shadow-sm"><i data-lucide="upload" class="w-6 h-6"></i></div>
+                             <h4 class="font-black text-slate-800 mb-1">Export Data</h4>
+                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Download .JSON</p>
+                        </button>
+                        <button onclick="document.getElementById('import-input').click()" class="p-8 bg-emerald-50 border border-emerald-100 rounded-3xl text-left hover:shadow-lg transition-all group">
+                            <input type="file" id="import-input" class="hidden" onchange="importData(event)">
+                            <div class="w-12 h-12 bg-white text-emerald-500 rounded-2xl flex items-center justify-center mb-6 shadow-sm"><i data-lucide="download" class="w-6 h-6"></i></div>
+                            <h4 class="font-black text-slate-800 mb-1">Restore Backup</h4>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Upload .JSON</p>
+                       </button>
+                    </div>
+
+                    <div class="p-8 bg-red-50 border border-red-100 rounded-3xl space-y-4">
+                        <h4 class="font-black text-red-600 flex items-center gap-2 italic">
+                            <i data-lucide="flame" class="w-5 h-5"></i> Danger Zone
+                        </h4>
+                        <p class="text-xs text-red-400 font-medium">This will burn down your digital shop. All products and orders will be deleted permanently.</p>
+                        <button onclick="burnDatabase()" class="px-6 py-2 bg-red-500 text-white text-xs font-black rounded-xl hover:bg-red-600 tracking-widest uppercase">Factory Reset</button>
+                    </div>
+                </div>
+             </section>
+
+        </div>
+
+        <!-- Product Modal -->
+        <div id="product-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center hidden p-4 no-print">
+            <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl scale-95 opacity-0 transition-all duration-300 transform modal-content">
+                <div class="p-8 border-b border-red-50 flex items-center justify-between">
+                    <h3 id="modal-title" class="text-2xl font-black text-slate-800 italic">Add New Dish</h3>
+                    <button onclick="closeProductModal()" class="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                <div class="p-8 space-y-5">
+                    <input type="hidden" id="prod-id">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dish Name</label>
+                        <input type="text" id="prod-name" placeholder="e.g. Cheese Kottu" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none focus:ring-4 focus:ring-red-500/10 transition-all">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+                            <select id="prod-cat" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none appearance-none">
+                                <option value="Rice">Rice</option>
+                                <option value="Kottu">Kottu</option>
+                                <option value="Drinks">Drinks</option>
+                                <option value="Snacks">Snacks</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stock</label>
+                            <input type="number" id="prod-stock" value="999" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Price (Rs.)</label>
+                        <input type="number" id="prod-price" placeholder="0.00" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-black text-2xl text-red-600 outline-none">
+                    </div>
+                </div>
+                <div class="p-8 border-t border-red-50 flex justify-end gap-4 bg-red-50/30 rounded-b-[2.5rem]">
+                    <button onclick="closeProductModal()" class="px-6 py-3 text-slate-400 font-bold">Cancel</button>
+                    <button onclick="saveProduct()" class="px-10 py-3 bg-red-500 text-white font-black rounded-2xl shadow-lg shadow-red-100 hover:bg-red-600 transition-all">SAVE DISH</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense Modal -->
+        <div id="expense-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center hidden p-4 no-print">
+            <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl scale-95 opacity-0 transition-all duration-300 transform modal-content">
+                <div class="p-8 border-b border-red-50 flex items-center justify-between">
+                    <h3 class="text-2xl font-black text-slate-800 italic">Record Cash Out</h3>
+                    <button onclick="closeExpenseModal()" class="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                <div class="p-8 space-y-5">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reason / Description</label>
+                        <input type="text" id="exp-desc" placeholder="e.g. Vegetables, Electricity" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Type / Category</label>
+                            <input type="text" id="exp-cat" placeholder="e.g. Utility, Food, Rent" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount (Rs.)</label>
+                            <input type="number" id="exp-amount" placeholder="0.00" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-black text-xl text-red-600 outline-none">
+                        </div>
+                    </div>
+                </div>
+                <div class="p-8 border-t border-red-50 flex justify-end gap-4 bg-red-50/30 rounded-b-[2.5rem]">
+                    <button onclick="closeExpenseModal()" class="px-6 py-3 text-slate-400 font-bold">Cancel</button>
+                    <button onclick="saveExpense()" class="px-10 py-3 bg-slate-800 text-white font-black rounded-2xl shadow-lg hover:bg-slate-900 transition-all">RECORD EXPENSE</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Material Modal -->
+        <div id="material-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center hidden p-4 no-print">
+            <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl scale-95 opacity-0 transition-all duration-300 transform modal-content">
+                <div class="p-8 border-b border-red-50 flex items-center justify-between">
+                    <h3 id="mat-modal-title" class="text-2xl font-black text-slate-800 italic">Add Raw Material</h3>
+                    <button onclick="closeMaterialModal()" class="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                <div class="p-8 space-y-5">
+                    <input type="hidden" id="mat-id">
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Material Name</label>
+                        <input type="text" id="mat-name" placeholder="e.g. Rice, Flour, Chicken" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit</label>
+                            <select id="mat-unit" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none appearance-none">
+                                <option value="kg">Kilograms (kg)</option>
+                                <option value="g">Grams (g)</option>
+                                <option value="pcs">Pieces (pcs)</option>
+                                <option value="l">Liters (l)</option>
+                                <option value="pkt">Packets (pkt)</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Stock</label>
+                            <input type="number" step="0.01" id="mat-stock" placeholder="0.00" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Min. Alert Level</label>
+                        <input type="number" step="0.01" id="mat-min" placeholder="e.g. 5.00" class="w-full px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-red-500 outline-none">
+                    </div>
+                </div>
+                <div class="p-8 border-t border-red-50 flex justify-end gap-4 bg-red-50/30 rounded-b-[2.5rem]">
+                    <button onclick="closeMaterialModal()" class="px-6 py-3 text-slate-400 font-bold">Cancel</button>
+                    <button onclick="saveMaterial()" class="px-10 py-3 bg-red-500 text-white font-black rounded-2xl shadow-lg hover:bg-red-600 transition-all">SAVE MATERIAL</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recipe Modal -->
+        <div id="recipe-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center hidden p-4 no-print">
+            <div class="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl scale-95 opacity-0 transition-all duration-300 transform modal-content">
+                <div class="p-8 border-b border-red-50 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800 italic">Ingredient Recipe</h3>
+                        <p id="recipe-for" class="text-xs text-slate-400 font-bold uppercase"></p>
+                    </div>
+                    <button onclick="closeRecipeModal()" class="w-10 h-10 flex items-center justify-center bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="x" class="w-6 h-6"></i></button>
+                </div>
+                <div class="p-8 space-y-6">
+                    <input type="hidden" id="recipe-prod-id">
+                    <div class="flex gap-4">
+                        <select id="recipe-mat-id" class="flex-1 px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none appearance-none">
+                            <!-- JS -->
+                        </select>
+                        <input type="number" id="recipe-qty" placeholder="Qty" class="w-24 px-5 py-4 bg-red-50 border border-red-50 rounded-2xl font-bold text-slate-800 outline-none">
+                        <button onclick="addRecipeItem()" class="px-6 bg-slate-800 text-white font-black rounded-2xl hover:bg-black transition-all">ADD</button>
+                    </div>
+                    <div class="overflow-hidden border border-red-50 rounded-2xl">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-red-50/50">
+                                <tr class="text-[10px] font-black text-red-500 uppercase tracking-widest">
+                                    <th class="px-4 py-3">Ingredient</th>
+                                    <th class="px-4 py-3">Qty</th>
+                                    <th class="px-4 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipe-items-list" class="divide-y divide-red-50">
+                                <!-- JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="p-8 border-t border-red-50 flex justify-end bg-red-50/30 rounded-b-[2.5rem]">
+                    <button onclick="closeRecipeModal()" class="px-10 py-3 bg-red-500 text-white font-black rounded-2xl shadow-lg hover:bg-red-600 transition-all uppercase tracking-widest">Done Setup</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div id="login-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center hidden p-4 no-print">
+            <div class="bg-white w-full max-w-xs rounded-[2.5rem] shadow-2xl scale-95 opacity-0 transition-all duration-300 transform modal-content p-10 text-center space-y-8">
+                <div class="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                    <i data-lucide="lock" class="w-10 h-10"></i>
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-slate-800 italic">Owner Access</h3>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Enter your secret PIN</p>
+                </div>
+                <input type="password" id="pin-input" placeholder="••••••" maxlength="6" class="w-full text-center text-4xl font-black tracking-[0.5rem] py-4 bg-red-50 border-none rounded-2xl text-slate-800 outline-none focus:ring-4 focus:ring-red-100 transition-all">
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="closeLoginModal()" class="py-3 text-slate-400 font-bold text-sm">Cancel</button>
+                    <button onclick="tryLogin()" class="py-3 bg-slate-800 text-white font-black rounded-2xl shadow-lg hover:bg-black transition-all">LOGIN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast-container" class="fixed bottom-10 right-10 z-[200] space-y-3 pointer-events-none"></div>
+
+    </main>
+
+    <!-- Printing Receipt -->
+    <div id="print-area" class="print-only p-8 bg-white text-black font-mono text-[10px] w-[58mm] mx-auto">
+        <div class="text-center font-bold mb-4 uppercase">
+            <h2 class="text-sm">FOODIE'S HUB</h2>
+            <p>Quality Food Shop</p>
+            <p class="text-[8px] font-normal pt-1" id="print-date"></p>
+        </div>
+        <div class="border-b border-black border-dashed mb-2"></div>
+        <table class="w-full mb-4">
+            <thead>
+                <tr class="text-left border-b border-black border-dotted">
+                    <th class="pb-1">ITEM</th>
+                    <th class="text-center">QTY</th>
+                    <th class="text-right">AMT</th>
+                </tr>
+            </thead>
+            <tbody id="print-items"></tbody>
+        </table>
+        <div class="border-t border-black border-dashed pt-2 space-y-1">
+            <div class="flex justify-between font-bold">
+                <span>TOTAL</span>
+                <span id="print-total"></span>
+            </div>
+            <div class="flex justify-between">
+                <span>CASH</span>
+                <span id="print-cash"></span>
+            </div>
+            <div class="flex justify-between font-bold border-t border-black border-dotted pt-1">
+                <span>CHANGE</span>
+                <span id="print-change"></span>
+            </div>
+        </div>
+        <div class="text-center mt-6 uppercase leading-tight italic">
+            <p>Thank you for coming!</p>
+            <p>Visit again soon</p>
+        </div>
+    </div>
+
+    <script>
+        // --- DB SETUP ---
+        const db = new Dexie("FoodShop_POS_DB");
+        db.version(5).stores({
+            products: '++id, name, price, category, stock',
+            orders: '++id, datetime, total_amount, method, cash, items',
+            expenses: '++id, datetime, amount, description, category',
+            materials: '++id, name, stock, unit, min_stock',
+            recipes: '++id, product_id, material_id, quantity',
+            settings: 'key'
+        });
+
+        // --- STATE ---
+        let cart = [];
+        let currentCat = 'All';
+        let currentSection = 'dashboard';
+        let currentMethod = 'cash';
+        let currentExpCat = 'All';
+        let isAdmin = false;
+
+        // --- NAVIGATION ---
+        async function showSection(sid) {
+            const protected = ['dashboard', 'inventory', 'reports', 'expenses', 'kitchen', 'settings'];
+            if (protected.includes(sid) && !isAdmin) {
+                openLoginModal(sid);
+                return;
+            }
+
+            currentSection = sid;
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(sid).classList.remove('hidden');
+            
+            document.querySelectorAll('.sidebar-btn').forEach(b => {
+                if (b.getAttribute('data-section') === sid) b.classList.add('sidebar-item-active');
+                else b.classList.remove('sidebar-item-active');
+            });
+
+            const titles = {
+                dashboard: "Kitchen Overview 🔥",
+                pos: "POS Station 🍕",
+                inventory: "Menu Management 🥘",
+                reports: "Sales Analytics 📈",
+                settings: "Master Settings ⚙️"
+            };
+            document.getElementById('section-title').innerText = titles[sid];
+
+            if (sid === 'dashboard') loadDashboard();
+            if (sid === 'pos') renderPOS();
+            if (sid === 'inventory') renderInventory();
+            if (sid === 'reports') loadReports();
+            if (sid === 'expenses') loadExpenses();
+            if (sid === 'kitchen') renderMaterials();
+            
+            lucide.createIcons();
+        }
+
+        // --- CLOCK ---
+        function runClock() {
+            const now = new Date();
+            document.getElementById('digital-clock').innerText = now.toLocaleTimeString();
+            document.getElementById('current-full-date').innerText = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        setInterval(runClock, 1000);
+        runClock();
+
+        // --- TOAST ---
+        function toast(msg, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = `p-4 pl-6 pr-10 rounded-2xl shadow-2xl flex items-center gap-4 min-w-[300px] border transform translate-x-full opacity-0 transition-all duration-300 pointer-events-auto ${
+                type === 'success' ? 'bg-white border-emerald-100 text-emerald-800' : 'bg-white border-red-100 text-red-800'
+            }`;
+            const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+            el.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6"></i><span class="font-black text-sm uppercase tracking-widest">${msg}</span>`;
+            container.appendChild(el);
+            lucide.createIcons();
+            setTimeout(() => el.classList.remove('translate-x-full', 'opacity-0'), 10);
+            setTimeout(() => {
+                el.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+        }
+
+        // --- DASHBOARD ---
+        async function loadDashboard() {
+            const today = new Date().setHours(0,0,0,0);
+            const sales = await db.orders.where('datetime').above(today).toArray();
+            const exps = await db.expenses.where('datetime').above(today).toArray();
+            
+            const revenue = sales.reduce((a, s) => a + s.total_amount, 0);
+            const cashRevenue = sales.filter(s => s.method === 'cash').reduce((a, s) => a + s.total_amount, 0);
+            const totalExp = exps.reduce((a, e) => a + e.amount, 0);
+            
+            const prodCount = await db.products.count();
+            const matCount = await db.materials.count();
+            
+            document.getElementById('dash-revenue').innerText = `Rs. ${revenue.toLocaleString()}`;
+            document.getElementById('dash-orders').innerText = sales.length;
+            document.getElementById('dash-materials').innerText = matCount;
+            document.getElementById('dash-cash-hand').innerText = `Rs. ${(revenue - totalExp).toLocaleString()}`;
+
+            const recent = document.getElementById('dash-recent-list');
+            recent.innerHTML = '';
+            sales.slice(-4).reverse().forEach(s => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-4 bg-slate-50 rounded-2xl";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-red-50"><i data-lucide="receipt" class="w-5 h-5 text-red-500"></i></div>
+                        <div><p class="font-black text-slate-800 text-sm">#ORD-${s.id}</p><p class="text-[10px] font-bold text-slate-400 capitalize">${s.method}</p></div>
+                    </div>
+                    <p class="font-black text-slate-800">Rs. ${s.total_amount.toFixed(2)}</p>
+                `;
+                recent.appendChild(div);
+            });
+
+            const low = document.getElementById('dash-low-stock');
+            low.innerHTML = '';
+            const lowStock = await db.products.where('stock').below(10).toArray();
+            lowStock.forEach(p => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between p-4 bg-red-50 rounded-2xl";
+                div.innerHTML = `
+                    <p class="font-black text-slate-800 text-sm">${p.name}</p>
+                    <span class="px-3 py-1 bg-red-500 text-white rounded-lg text-[10px] font-black">${p.stock} LEFT</span>
+                `;
+                low.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        // --- POS ---
+        async function renderPOS() {
+            await renderCategories();
+            const search = document.getElementById('pos-search').value.toLowerCase();
+            const prods = await db.products.toArray();
+            let filtered = prods.filter(p => (currentCat === 'All' || p.category === currentCat) && p.name.toLowerCase().includes(search));
+
+            const grid = document.getElementById('pos-grid');
+            grid.innerHTML = '';
+            filtered.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "food-card p-5 bg-white border border-red-50 rounded-3xl shadow-sm cursor-pointer transition-all hover:bg-red-50 group flex flex-col justify-between h-[180px]";
+                card.onclick = () => addToCart(p);
+                card.innerHTML = `
+                    <div class="space-y-1">
+                        <div class="flex justify-between">
+                             <span class="text-[8px] font-black text-red-400 uppercase tracking-widest bg-red-50 px-2 py-1 rounded-lg">${p.category}</span>
+                             <span class="text-[8px] font-black ${p.stock < 10 ? 'text-red-600' : 'text-slate-300'}">${p.stock} left</span>
+                        </div>
+                        <h4 class="font-black text-slate-800 text-sm line-clamp-2 md:text-md">${p.name}</h4>
+                    </div>
+                    <div class="flex items-center justify-between mt-4">
+                        <p class="text-lg font-black text-red-500">Rs. ${p.price.toFixed(0)}</p>
+                        <div class="w-10 h-10 bg-white border border-red-100 text-red-500 rounded-xl flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-all shadow-sm">
+                            <i data-lucide="plus" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+            lucide.createIcons();
+        }
+
+        async function renderCategories() {
+            const products = await db.products.toArray();
+            const uniqueCats = ['All', ...new Set(products.map(p => p.category))];
+            const container = document.getElementById('pos-categories');
+            
+            // Only re-render if categories changed or first time
+            const currentButtons = Array.from(container.querySelectorAll('button')).map(b => b.innerText);
+            if (JSON.stringify(currentButtons) === JSON.stringify(uniqueCats)) return;
+
+            container.innerHTML = '';
+            uniqueCats.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.onclick = () => filterCategory(cat);
+                btn.className = `category-btn px-6 py-4 rounded-2xl text-sm font-bold transition-all text-left flex items-center justify-between group ${cat === currentCat ? 'category-pill-active' : 'text-slate-400 bg-white border border-red-50 hover:bg-red-50 hover:text-red-500'}`;
+                btn.innerHTML = `
+                    <span>${cat}</span>
+                    <i data-lucide="chevron-right" class="w-4 h-4 opacity-0 group-hover:opacity-100 transition-all"></i>
+                `;
+                container.appendChild(btn);
+            });
+            lucide.createIcons();
+        }
+
+        function filterCategory(cat) {
+            currentCat = cat;
+            document.querySelectorAll('.category-btn').forEach(b => {
+                if (b.innerText.trim() === cat) {
+                    b.className = `category-btn px-6 py-4 rounded-2xl text-sm font-bold transition-all text-left flex items-center justify-between group category-pill-active`;
+                } else {
+                    b.className = `category-btn px-6 py-4 rounded-2xl text-sm font-bold transition-all text-left flex items-center justify-between group text-slate-400 bg-white border border-red-50 hover:bg-red-50 hover:text-red-500`;
+                }
+            });
+            renderPOS();
+        }
+
+        document.getElementById('pos-search').oninput = renderPOS;
+
+        function addToCart(p) {
+            const ex = cart.find(i => i.id === p.id);
+            if (ex) {
+                if (ex.qty < p.stock) ex.qty++;
+                else return toast('Not enough stock', 'error');
+            } else {
+                cart.push({ ...p, qty: 1 });
+            }
+            updateCart();
+        }
+
+        function updateQty(id, delta) {
+            const item = cart.find(i => i.id === id);
+            if (!item) return;
+            item.qty += delta;
+            if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
+            updateCart();
+        }
+
+        function updateCart() {
+            const list = document.getElementById('cart-list');
+            if (cart.length === 0) {
+                list.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-slate-300 opacity-60"><i data-lucide="soup" class="w-16 h-16 mb-4 animate-bounce"></i><p class="font-bold text-lg italic">Hungry for orders?</p></div>`;
+            } else {
+                list.innerHTML = '';
+                cart.forEach(i => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center gap-4 bg-red-50/20 py-2 rounded-xl animate-pop";
+                    row.innerHTML = `
+                        <div class="flex-1">
+                            <h5 class="text-xs font-black text-slate-800 line-clamp-1">${i.name}</h5>
+                            <p class="text-[10px] font-bold text-slate-400">Rs. ${i.price} each</p>
+                        </div>
+                        <div class="flex items-center bg-white border border-red-50 rounded-xl p-1 shadow-sm">
+                            <button onclick="updateQty(${i.id}, -1)" class="w-7 h-7 flex items-center justify-center text-red-500"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                            <span class="w-6 text-center text-xs font-black text-slate-800">${i.qty}</span>
+                            <button onclick="updateQty(${i.id}, 1)" class="w-7 h-7 flex items-center justify-center text-red-500"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                        </div>
+                        <p class="w-20 text-right font-black text-slate-800 text-sm">Rs. ${(i.price * i.qty).toFixed(0)}</p>
+                    `;
+                    list.appendChild(row);
+                });
+            }
+            const total = cart.reduce((a, b) => a + (b.price * b.qty), 0);
+            document.getElementById('cart-subtotal').innerText = `Rs. ${total.toFixed(2)}`;
+            document.getElementById('cart-total').innerText = `Rs. ${total.toFixed(2)}`;
+            calcBalance();
+            lucide.createIcons();
+        }
+
+        function calcBalance() {
+            const total = parseFloat(document.getElementById('cart-total').innerText.replace('Rs. ', '')) || 0;
+            const cash = parseFloat(document.getElementById('cash-input').value) || 0;
+            document.getElementById('cash-balance').innerText = `Rs. ${Math.max(0, cash - total).toFixed(2)}`;
+        }
+
+        function clearCart() { cart = []; updateCart(); document.getElementById('cash-input').value = ''; }
+
+        function setPaymentMethod(method) {
+            currentMethod = method;
+            const cashBtn = document.getElementById('pay-cash');
+            const onlineBtn = document.getElementById('pay-online');
+            const cashArea = document.getElementById('cash-input').parentElement;
+            const balArea = document.getElementById('balance-area');
+
+            if (method === 'cash') {
+                cashBtn.className = "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-500 text-white shadow-lg shadow-red-100";
+                onlineBtn.className = "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-slate-400 hover:bg-blue-50 hover:text-blue-500";
+                cashArea.style.display = 'block';
+                balArea.style.display = 'flex';
+            } else {
+                onlineBtn.className = "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-blue-500 text-white shadow-lg shadow-blue-100";
+                cashBtn.className = "flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-slate-400 hover:bg-red-50 hover:text-red-500";
+                cashArea.style.display = 'none';
+                balArea.style.display = 'none';
+            }
+            lucide.createIcons();
+        }
+
+        async function checkout() {
+            if (cart.length === 0) return toast('Bro, cart is empty!', 'error');
+            const total = parseFloat(document.getElementById('cart-total').innerText.replace('Rs. ', ''));
+            const cash = currentMethod === 'cash' ? (parseFloat(document.getElementById('cash-input').value) || 0) : total;
+            
+            if (currentMethod === 'cash' && cash < total && total > 0) return toast('Insufficient cash!', 'error');
+
+            const order = {
+                datetime: Date.now(),
+                total_amount: total,
+                cash: cash,
+                method: currentMethod,
+                items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, price: i.price }))
+            };
+
+            const oid = await db.orders.add(order);
+            
+            for (const i of cart) {
+                // Deduct Product Stock
+                await db.products.where('id').equals(i.id).modify(p => { p.stock -= i.qty; });
+                
+                // Deduct Raw Material Stock based on Recipe
+                const rps = await db.recipes.where('product_id').equals(i.id).toArray();
+                for (const r of rps) {
+                    await db.materials.where('id').equals(r.material_id).modify(mat => {
+                        mat.stock -= (r.quantity * i.qty);
+                    });
+                }
+            }
+
+            printBill(order, oid);
+            toast('Order served! 👨‍🍳');
+            clearCart();
+            renderPOS();
+        }
+
+        function printBill(order, id) {
+            document.getElementById('print-date').innerText = new Date(order.datetime).toLocaleString();
+            const list = document.getElementById('print-items');
+            list.innerHTML = '';
+            order.items.forEach(i => {
+                list.innerHTML += `<tr><td class="pt-1">${i.name}</td><td class="text-center">${i.qty}</td><td class="text-right">${(i.price * i.qty).toFixed(0)}</td></tr>`;
+            });
+            document.getElementById('print-total').innerText = order.total_amount.toFixed(2);
+            document.getElementById('print-cash').innerText = order.method === 'cash' ? order.cash.toFixed(2) : "ONLINE";
+            document.getElementById('print-change').innerText = order.method === 'cash' ? (order.cash - order.total_amount).toFixed(2) : "0.00";
+            window.print();
+        }
+
+        // --- INVENTORY ---
+        function openProductModal(id = null) {
+            const modal = document.getElementById('product-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0'), 10);
+            
+            if (id) {
+                db.products.get(id).then(p => {
+                    document.getElementById('modal-title').innerText = "Edit Dish";
+                    document.getElementById('prod-id').value = p.id;
+                    document.getElementById('prod-name').value = p.name;
+                    document.getElementById('prod-cat').value = p.category;
+                    document.getElementById('prod-price').value = p.price;
+                    document.getElementById('prod-stock').value = p.stock;
+                });
+            } else {
+                document.getElementById('modal-title').innerText = "Add New Dish";
+                document.getElementById('prod-id').value = '';
+                document.getElementById('prod-name').value = '';
+                document.getElementById('prod-price').value = '';
+                document.getElementById('prod-stock').value = '999';
+            }
+        }
+
+        function closeProductModal() {
+            const m = document.getElementById('product-modal');
+            m.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        async function saveProduct() {
+            const data = {
+                name: document.getElementById('prod-name').value,
+                category: document.getElementById('prod-cat').value,
+                price: parseFloat(document.getElementById('prod-price').value),
+                stock: parseInt(document.getElementById('prod-stock').value)
+            };
+            const id = document.getElementById('prod-id').value;
+            if (id) data.id = parseInt(id);
+            await db.products.put(data);
+            toast('Menu updated!');
+            closeProductModal();
+            renderInventory();
+        }
+
+        async function deleteProduct(id) {
+            if (confirm('Banish this dish from menu?')) {
+                await db.products.delete(id);
+                toast('Dish removed', 'error');
+                renderInventory();
+            }
+        }
+
+        async function renderInventory() {
+            const items = await db.products.toArray();
+            const list = document.getElementById('inventory-list');
+            list.innerHTML = '';
+            items.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-red-50 transition-colors group";
+                tr.innerHTML = `
+                    <td class="px-8 py-5">
+                        <div class="font-black text-slate-800 text-sm">${p.name}</div>
+                        <div class="text-[10px] text-slate-300 font-bold uppercase">ID: ${p.id}</div>
+                    </td>
+                    <td class="px-8 py-5"><span class="px-3 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest">${p.category}</span></td>
+                    <td class="px-8 py-5 font-black text-red-500">Rs. ${p.price.toFixed(2)}</td>
+                    <td class="px-8 py-5">
+                        <div class="flex items-center gap-2">
+                             <div class="w-2 h-2 rounded-full ${p.stock < 10 ? 'bg-red-500' : 'bg-emerald-500'}"></div>
+                             <span class="font-bold text-slate-600 text-sm">${p.stock} units</span>
+                        </div>
+                    </td>
+                    <td class="px-8 py-5 text-right space-x-2">
+                        <button onclick="openRecipeModal(${p.id})" class="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm" title="Recipe"><i data-lucide="chef-hat" class="w-4 h-4"></i></button>
+                        <button onclick="openProductModal(${p.id})" class="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteProduct(${p.id})" class="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // --- REPORTS ---
+        async function loadReports() {
+            const dateStr = document.getElementById('rep-date').value;
+            const start = dateStr ? new Date(dateStr).setHours(0,0,0,0) : 0;
+            const end = dateStr ? new Date(dateStr).setHours(23,59,59,999) : Infinity;
+
+            const sales = await db.orders.where('datetime').between(start, end).toArray();
+            const totalAmount = sales.reduce((a, s) => a + s.total_amount, 0);
+            
+            document.getElementById('rep-total').innerText = `Rs. ${totalAmount.toLocaleString()}`;
+            document.getElementById('rep-count').innerText = sales.length;
+
+            const list = document.getElementById('reports-list');
+            list.innerHTML = '';
+            sales.reverse().forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-red-50 transition-colors group";
+                tr.innerHTML = `
+                    <td class="px-8 py-5 font-mono text-[10px] text-slate-300 font-black">#FOOD-${s.id}</td>
+                    <td class="px-8 py-5 text-xs font-bold text-slate-400">${new Date(s.datetime).toLocaleTimeString()}</td>
+                    <td class="px-8 py-5 text-xs font-medium text-slate-600 truncate max-w-xs">${s.items.map(i => `${i.qty}x ${i.name}`).join(', ')}</td>
+                    <td class="px-8 py-5 font-black text-slate-800 text-sm">Rs. ${s.total_amount.toFixed(2)}</td>
+                    <td class="px-8 py-5 text-right">
+                        <button onclick="rePrint(${s.id})" class="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="printer" class="w-4 h-4"></i></button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        async function rePrint(id) {
+            const o = await db.orders.get(id);
+            if (o) printBill(o, id);
+        }
+
+        async function exportCSV() {
+            const sales = await db.orders.toArray();
+            let csv = "ID,Date,Amount,Method\n";
+            sales.forEach(s => csv += `${s.id},${new Date(s.datetime).toISOString()},${s.total_amount},${s.method}\n`);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a'); 
+            a.href = url; a.download = `food_shop_sales_${Date.now()}.csv`;
+            a.click();
+        }
+
+        // --- EXPENSES ---
+        function openExpenseModal() {
+            const m = document.getElementById('expense-modal');
+            m.classList.remove('hidden');
+            setTimeout(() => m.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0'), 10);
+            document.getElementById('exp-desc').value = '';
+            document.getElementById('exp-amount').value = '';
+        }
+
+        function closeExpenseModal() {
+            const m = document.getElementById('expense-modal');
+            m.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        async function saveExpense() {
+            const amount = parseFloat(document.getElementById('exp-amount').value);
+            const desc = document.getElementById('exp-desc').value;
+            if (!amount || !desc) return toast('Please fill all fields', 'error');
+
+            await db.expenses.add({
+                datetime: Date.now(),
+                amount: amount,
+                description: desc,
+                category: document.getElementById('exp-cat').value
+            });
+
+            toast('Expense recorded!');
+            closeExpenseModal();
+            loadExpenses();
+        }
+
+        async function loadExpenses() {
+            await renderExpenseCategories();
+            const dateStr = document.getElementById('exp-date-filter').value;
+            const start = dateStr ? new Date(dateStr).setHours(0,0,0,0) : 0;
+            const end = dateStr ? new Date(dateStr).setHours(23,59,59,999) : Infinity;
+
+            let exps = await db.expenses.where('datetime').between(start, end).toArray();
+            
+            if (currentExpCat !== 'All') {
+                exps = exps.filter(e => e.category === currentExpCat);
+            }
+
+            const total = exps.reduce((a, e) => a + e.amount, 0);
+            const max = exps.length > 0 ? Math.max(...exps.map(e => e.amount)) : 0;
+
+            document.getElementById('exp-today-total').innerText = `Rs. ${total.toFixed(2)}`;
+            document.getElementById('exp-highest').innerText = `Rs. ${max.toFixed(2)}`;
+
+            const list = document.getElementById('expenses-list');
+            list.innerHTML = '';
+            exps.reverse().forEach(e => {
+                list.innerHTML += `
+                    <tr class="hover:bg-red-50 transition-colors">
+                        <td class="px-8 py-5 text-xs font-bold text-slate-400">${new Date(e.datetime).toLocaleTimeString()}</td>
+                        <td class="px-8 py-5 text-sm font-black text-slate-800">${e.description}</td>
+                        <td class="px-8 py-5"><span class="px-3 py-1 bg-slate-100 text-slate-400 rounded-lg text-[10px] uppercase font-bold tracking-widest">${e.category}</span></td>
+                        <td class="px-8 py-5 text-sm font-black text-red-500">Rs. ${e.amount.toFixed(2)}</td>
+                        <td class="px-8 py-5 text-right">
+                            <button onclick="deleteExpense(${e.id})" class="text-red-300 hover:text-red-500 transition-colors"><i data-lucide="x-circle" class="w-5 h-5"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        async function renderExpenseCategories() {
+            const expenses = await db.expenses.toArray();
+            const uniqueCats = ['All', ...new Set(expenses.map(e => e.category))];
+            const container = document.getElementById('exp-cat-strip');
+            
+            // Only re-render if categories changed
+            const currentButtons = Array.from(container.querySelectorAll('button')).map(b => b.innerText.trim());
+            if (JSON.stringify(currentButtons) === JSON.stringify(uniqueCats)) return;
+
+            container.innerHTML = '';
+            uniqueCats.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.onclick = () => filterExpenseCat(cat);
+                const isActive = cat === currentExpCat;
+                btn.className = `exp-cat-btn px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isActive ? 'bg-red-500 text-white shadow-lg shadow-red-100' : 'text-slate-400 bg-white border border-red-50 hover:bg-red-50 hover:text-red-500'}`;
+                btn.innerText = cat;
+                container.appendChild(btn);
+            });
+        }
+
+        function filterExpenseCat(cat) {
+            currentExpCat = cat;
+            document.querySelectorAll('.exp-cat-btn').forEach(btn => {
+                if (btn.innerText.trim() === cat) {
+                    btn.className = "exp-cat-btn px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-red-500 text-white shadow-lg shadow-red-100";
+                } else {
+                    btn.className = "exp-cat-btn px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-slate-400 bg-white border border-red-50 hover:bg-red-50 hover:text-red-500";
+                }
+            });
+            loadExpenses();
+        }
+
+        async function deleteExpense(id) {
+            if (confirm('Delete this expense record?')) {
+                await db.expenses.delete(id);
+                toast('Expense removed', 'error');
+                loadExpenses();
+            }
+        }
+
+        // --- KITCHEN MATERIALS ---
+        function openMaterialModal(id = null) {
+            const m = document.getElementById('material-modal');
+            m.classList.remove('hidden');
+            setTimeout(() => m.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0'), 10);
+            
+            if (id) {
+                db.materials.get(id).then(mat => {
+                    document.getElementById('mat-modal-title').innerText = "Edit Material";
+                    document.getElementById('mat-id').value = mat.id;
+                    document.getElementById('mat-name').value = mat.name;
+                    document.getElementById('mat-unit').value = mat.unit;
+                    document.getElementById('mat-stock').value = mat.stock;
+                    document.getElementById('mat-min').value = mat.min_stock;
+                });
+            } else {
+                document.getElementById('mat-modal-title').innerText = "Add Raw Material";
+                document.getElementById('mat-id').value = '';
+                document.getElementById('mat-name').value = '';
+                document.getElementById('mat-stock').value = '';
+                document.getElementById('mat-min').value = '1.00';
+            }
+        }
+
+        function closeMaterialModal() {
+            const m = document.getElementById('material-modal');
+            m.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        async function saveMaterial() {
+            const data = {
+                name: document.getElementById('mat-name').value,
+                unit: document.getElementById('mat-unit').value,
+                stock: parseFloat(document.getElementById('mat-stock').value),
+                min_stock: parseFloat(document.getElementById('mat-min').value)
+            };
+            const id = document.getElementById('mat-id').value;
+            if (id) data.id = parseInt(id);
+            await db.materials.put(data);
+            toast('Material stock updated!');
+            closeMaterialModal();
+            renderMaterials();
+        }
+
+        async function deleteMaterial(id) {
+            if (confirm('Delete this material record?')) {
+                await db.materials.delete(id);
+                toast('Material removed', 'error');
+                renderMaterials();
+            }
+        }
+
+        async function renderMaterials() {
+            const mats = await db.materials.toArray();
+            const list = document.getElementById('materials-list');
+            list.innerHTML = '';
+            mats.forEach(m => {
+                const tr = document.createElement('tr');
+                const isLow = m.stock <= m.min_stock;
+                tr.className = `hover:bg-red-50 transition-colors ${isLow ? 'bg-red-50/50' : ''}`;
+                tr.innerHTML = `
+                    <td class="px-8 py-5">
+                        <div class="font-black text-slate-800 text-sm">${m.name}</div>
+                    </td>
+                    <td class="px-8 py-5 font-black text-slate-600">${m.stock} ${m.unit}</td>
+                    <td class="px-8 py-5 font-bold text-slate-400">${m.min_stock} ${m.unit}</td>
+                    <td class="px-8 py-5">
+                        <span class="px-3 py-1 ${isLow ? 'bg-red-500 text-white' : 'bg-emerald-100 text-emerald-600'} rounded-lg text-[10px] font-black uppercase">
+                            ${isLow ? 'Low Stock' : 'Good'}
+                        </span>
+                    </td>
+                    <td class="px-8 py-5 text-right space-x-2">
+                         <button onclick="openMaterialModal(${m.id})" class="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-800 hover:text-white transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                         <button onclick="deleteMaterial(${m.id})" class="p-2 bg-slate-50 text-slate-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                `;
+                list.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        // --- RECIPE MANAGEMENT ---
+        async function openRecipeModal(pid) {
+            const prod = await db.products.get(pid);
+            document.getElementById('recipe-for').innerText = "For: " + prod.name;
+            document.getElementById('recipe-prod-id').value = pid;
+            
+            const mats = await db.materials.toArray();
+            const matSelect = document.getElementById('recipe-mat-id');
+            matSelect.innerHTML = mats.map(m => `<option value="${m.id}">${m.name} (${m.unit})</option>`).join('');
+
+            const modal = document.getElementById('recipe-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0'), 10);
+            renderRecipeItems();
+        }
+
+        async function renderRecipeItems() {
+            const pid = parseInt(document.getElementById('recipe-prod-id').value);
+            const items = await db.recipes.where('product_id').equals(pid).toArray();
+            const list = document.getElementById('recipe-items-list');
+            list.innerHTML = '';
+            
+            for (const item of items) {
+                const mat = await db.materials.get(item.material_id);
+                list.innerHTML += `
+                    <tr>
+                        <td class="px-4 py-3 font-bold">${mat.name}</td>
+                        <td class="px-4 py-3">${item.quantity} ${mat.unit}</td>
+                        <td class="px-4 py-3 text-right">
+                             <button onclick="removeRecipeItem(${item.id})" class="text-red-400 hover:text-red-600"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        async function addRecipeItem() {
+            const pid = parseInt(document.getElementById('recipe-prod-id').value);
+            const mid = parseInt(document.getElementById('recipe-mat-id').value);
+            const qty = parseFloat(document.getElementById('recipe-qty').value);
+            if (!qty) return toast('Invalid quantity', 'error');
+
+            await db.recipes.add({ product_id: pid, material_id: mid, quantity: qty });
+            document.getElementById('recipe-qty').value = '';
+            renderRecipeItems();
+        }
+
+        async function removeRecipeItem(rid) {
+            await db.recipes.delete(rid);
+            renderRecipeItems();
+        }
+
+        function closeRecipeModal() {
+            const m = document.getElementById('recipe-modal');
+            m.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        // --- SETTINGS ---
+        async function exportData() {
+            const p = await db.products.toArray();
+            const o = await db.orders.toArray();
+            const e = await db.expenses.toArray();
+            const m = await db.materials.toArray();
+            const r = await db.recipes.toArray();
+            const blob = new Blob([JSON.stringify({ products: p, orders: o, expenses: e, materials: m, recipes: r })], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `foodie_backup_${Date.now()}.json`;
+            a.click();
+            toast('Inventory backup saved!');
+        }
+
+        async function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const data = JSON.parse(ev.target.result);
+                if (confirm('Merge backup with current shop?')) {
+                    if (data.products) for (const pr of data.products) { delete pr.id; await db.products.add(pr); }
+                    if (data.orders) for (const ord of data.orders) { delete ord.id; await db.orders.add(ord); }
+                    if (data.expenses) for (const ex of data.expenses) { delete ex.id; await db.expenses.add(ex); }
+                    if (data.materials) for (const ma of data.materials) { delete ma.id; await db.materials.add(ma); }
+                    if (data.recipes) for (const re of data.recipes) { delete re.id; await db.recipes.add(re); }
+                    toast('Kitchen restored!');
+                    showSection('dashboard');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function burnDatabase() {
+            if (prompt('Type "BURN" to delete everything:') === 'BURN') {
+                await db.products.clear();
+                await db.orders.clear();
+                await db.expenses.clear();
+                await db.materials.clear();
+                await db.recipes.clear();
+                toast('Shop reset completed', 'error');
+                location.reload();
+            }
+        }
+
+        // --- ACCESS CONTROL ---
+        let pendingSection = 'dashboard';
+        
+        function openLoginModal(target) {
+            pendingSection = target;
+            const m = document.getElementById('login-modal');
+            m.classList.remove('hidden');
+            setTimeout(() => m.querySelector('.modal-content').classList.remove('scale-95', 'opacity-0'), 10);
+            document.getElementById('pin-input').value = '';
+            document.getElementById('pin-input').focus();
+        }
+
+        function closeLoginModal() {
+            const m = document.getElementById('login-modal');
+            m.querySelector('.modal-content').classList.add('scale-95', 'opacity-0');
+            setTimeout(() => m.classList.add('hidden'), 300);
+        }
+
+        async function tryLogin() {
+            const pin = document.getElementById('pin-input').value;
+            const record = await db.settings.get('admin_pin');
+            const savedPin = record ? record.value : '159357';
+
+            if (pin === savedPin) {
+                isAdmin = true;
+                toast('Owner access granted', 'success');
+                closeLoginModal();
+                updateAccessUI();
+                showSection(pendingSection);
+            } else {
+                toast('Invalid PIN!', 'error');
+                document.getElementById('pin-input').value = '';
+            }
+        }
+
+        function updateAccessUI() {
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+            const lockBtn = document.getElementById('lock-btn');
+            
+            if (isAdmin) {
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                text.innerText = "Owner Mode";
+                text.className = "text-[10px] font-black uppercase tracking-widest text-emerald-600";
+                lockBtn.classList.remove('hidden');
+                document.querySelectorAll('.sidebar-btn').forEach(btn => btn.classList.remove('opacity-40'));
+            } else {
+                dot.className = "w-2 h-2 rounded-full bg-slate-400";
+                text.innerText = "Staff Mode";
+                text.className = "text-[10px] font-black uppercase tracking-widest text-slate-400";
+                lockBtn.classList.add('hidden');
+                document.querySelectorAll('.sidebar-btn').forEach(btn => {
+                    const sid = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+                    if (sid !== 'pos') btn.classList.add('opacity-40');
+                });
+            }
+        }
+
+        function lockAdmin() {
+            isAdmin = false;
+            updateAccessUI();
+            showSection('pos');
+            toast('Logged out from Admin', 'error');
+        }
+
+        async function updatePIN() {
+            const old = document.getElementById('old-pin').value;
+            const record = await db.settings.get('admin_pin');
+            const savedPin = record ? record.value : '159357';
+            
+            if (old !== savedPin) return toast('Current PIN is wrong!', 'error');
+            const next = document.getElementById('new-pin').value;
+            if (next.length !== 6) return toast('PIN must be 6 digits', 'error');
+
+            await db.settings.put({ key: 'admin_pin', value: next });
+            toast('PIN updated successfully!');
+            document.getElementById('old-pin').value = '';
+            document.getElementById('new-pin').value = '';
+        }
+
+        // --- INIT ---
+        async function init() {
+            document.getElementById('rep-date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('exp-date-filter').value = new Date().toISOString().split('T')[0];
+            updateAccessUI();
+            showSection('pos'); // Start in POS mode for staff
+        }
+        init();
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', e => {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                showSection('pos');
+                document.getElementById('pos-search').focus();
+            }
+            if (e.key === 'F4') {
+                e.preventDefault();
+                showSection('dashboard');
+            }
+            if (e.key === 'F6') {
+                e.preventDefault();
+                showSection('expenses');
+                openExpenseModal();
+            }
+            if (e.key === 'F8') {
+                e.preventDefault();
+                showSection('kitchen');
+            }
+        });
+
+    </script>
+</body>
+</html>
