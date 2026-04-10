@@ -57,9 +57,13 @@
             0% { transform: scale(0.95); }
             100% { transform: scale(1); }
         }
+        .food-card:active {
+            background-color: #fecaca;
+            transform: scale(0.95);
+        }
     </style>
 </head>
-<body class="h-screen flex overflow-hidden">
+<body class="h-screen flex overflow-hidden bg-slate-50">
 
     <!-- Sidebar -->
     <aside class="w-20 md:w-64 bg-white border-r border-red-100 flex flex-col no-print">
@@ -201,9 +205,8 @@
                 </div>
             </section>
 
-            <!-- POS Section -->
             <section id="pos" class="h-full hidden">
-                <div class="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
+                <div class="flex flex-col lg:flex-row gap-6 h-full overflow-y-auto lg:overflow-hidden pb-20 lg:pb-0">
                     <!-- Category Sidebar -->
                     <div class="w-full lg:w-48 flex lg:flex-col gap-2 overflow-x-auto lg:overflow-y-auto no-scrollbar pb-2 lg:pb-0" id="pos-categories">
                         <!-- Dynamic Categories will be injected here -->
@@ -280,6 +283,13 @@
                         </div>
                     </div>
                 </div>
+                <!-- Mobile Floating Cart Button -->
+                <button onclick="document.getElementById('cart-list').scrollIntoView({behavior:'smooth'})" class="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-red-500 text-white rounded-full shadow-2xl flex items-center justify-center z-50 animate-bounce active:scale-90">
+                    <div class="relative">
+                        <i data-lucide="shopping-cart" class="w-8 h-8"></i>
+                        <span id="mobile-cart-count" class="absolute -top-2 -right-2 bg-slate-800 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">0</span>
+                    </div>
+                </button>
             </section>
 
             <!-- Inventory Section -->
@@ -833,9 +843,9 @@
             const grid = document.getElementById('pos-grid');
             grid.innerHTML = '';
             filtered.forEach(p => {
-                const card = document.createElement('div');
-                card.className = "food-card p-5 bg-white border border-red-50 rounded-3xl shadow-sm cursor-pointer transition-all hover:bg-red-50 group flex flex-col justify-between h-[180px]";
+                const card = document.createElement('button');
                 card.onclick = () => addToCart(p);
+                card.className = "food-card p-5 bg-white border border-red-50 rounded-3xl shadow-sm cursor-pointer transition-all active:scale-95 text-left group flex flex-col justify-between h-[180px]";
                 card.innerHTML = `
                     <div class="space-y-1">
                         <div class="flex justify-between">
@@ -894,6 +904,7 @@
         document.getElementById('pos-search').oninput = renderPOS;
 
         function addToCart(p) {
+            if (p.stock <= 0) return toast('Out of stock!', 'error');
             const ex = cart.find(i => i.id === p.id);
             if (ex) {
                 if (ex.qty < p.stock) ex.qty++;
@@ -901,6 +912,11 @@
             } else {
                 cart.push({ ...p, qty: 1 });
             }
+            
+            // Visual feedback
+            if (window.navigator && window.navigator.vibrate) window.navigator.vibrate(50);
+            toast(`${p.name} added to cart!`);
+            
             updateCart();
         }
 
@@ -939,6 +955,11 @@
             const total = cart.reduce((a, b) => a + (b.price * b.qty), 0);
             document.getElementById('cart-subtotal').innerText = `Rs. ${total.toFixed(2)}`;
             document.getElementById('cart-total').innerText = `Rs. ${total.toFixed(2)}`;
+            
+            // Update mobile count
+            const count = cart.reduce((a, b) => a + b.qty, 0);
+            document.getElementById('mobile-cart-count').innerText = count;
+            
             calcBalance();
             lucide.createIcons();
         }
